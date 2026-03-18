@@ -44,7 +44,10 @@ button { background:#111; color:#fff; cursor:pointer; }
   <!-- Inventory -->
   <div id="inventory" style="display:none">
     <h3>Add Product</h3>
+    <input id="item_id" placeholder="Item ID / SKU">
     <input id="pname" placeholder="Name">
+    <input id="model" placeholder="Model">
+    <input id="category" placeholder="Category">
     <input id="pprice" type="number" placeholder="Price">
     <input id="pcost" type="number" placeholder="Cost">
     <input id="pstock" type="number" placeholder="Stock">
@@ -73,7 +76,7 @@ button { background:#111; color:#fff; cursor:pointer; }
 </div>
 
 <script>
-const API = "https://js-pos-backend.onrender.com"; // Change to deployed backend
+const API = "http://localhost:3000"; // Change if deployed
 let token=""; let products=[]; let cart=[];
 
 // LOGIN
@@ -106,11 +109,11 @@ async function loadProducts(){
 
 function renderProducts(){
   const div = document.getElementById("products"); div.innerHTML="";
-  products.forEach((p,i)=>{ div.innerHTML+=`<div class="card">${p.name} - KES ${p.price} (Stock:${p.stock}) <button onclick="addToCart(${i})">Add</button></div>`; });
+  products.forEach((p,i)=>{ div.innerHTML+=`<div class="card">[${p.item_id}] ${p.name} - ${p.model} - ${p.category} - KES ${p.price} (Stock:${p.stock}) <button onclick="addToCart(${i})">Add</button></div>`; });
 }
 
 async function addProduct(){
-  const p={name:pname.value,price:+pprice.value,cost:+pcost.value,stock:+pstock.value};
+  const p={item_id:item_id.value,name:pname.value,model:model.value,category:category.value,price:+pprice.value,cost:+pcost.value,stock:+pstock.value};
   await fetch(API+"/products",{method:"POST",headers:{"Content-Type":"application/json","Authorization":token},body:JSON.stringify(p)});
   loadProducts(); loadTransferProducts();
 }
@@ -139,7 +142,7 @@ async function checkout(){
 }
 
 function printReceipt(cart,total){
-  let text=`JS DISTRIBUTORS\n----------------\n`; cart.forEach(p=>text+=`${p.name} - KES ${p.price}\n`);
+  let text=`JS DISTRIBUTORS\n----------------\n`; cart.forEach(p=>text+=`[${p.item_id}] ${p.name} - ${p.model} - ${p.category} - KES ${p.price}\n`);
   text+=`----------------\nTOTAL: KES ${total}\n`; const w=window.open(""); w.document.write("<pre>"+text+"</pre>"); w.print();
 }
 
