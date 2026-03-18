@@ -41,9 +41,22 @@ button { background:#111; color:#fff; cursor:pointer; }
     <button onclick="checkout()">Pay (M-Pesa)</button>
   </div>
 
-  <!-- Inventory -->
+  <!-- INVENTORY -->
   <div id="inventory" style="display:none">
-    <h3>Add Product</h3>
+    <h3>View Stock</h3>
+    <div id="stockList"></div>
+
+    <h3>Add Stock</h3>
+    <select id="stockProduct"></select>
+    <input id="addStockQty" type="number" placeholder="Quantity">
+    <button onclick="addStock()">Add Stock</button>
+
+    <h3>Sell Product</h3>
+    <select id="sellProduct"></select>
+    <input id="sellQty" type="number" placeholder="Quantity">
+    <button onclick="sellStock()">Sell</button>
+
+    <h3>Add New Product</h3>
     <input id="item_id" placeholder="Item ID / SKU">
     <input id="pname" placeholder="Name">
     <input id="model" placeholder="Model">
@@ -51,7 +64,7 @@ button { background:#111; color:#fff; cursor:pointer; }
     <input id="pprice" type="number" placeholder="Price">
     <input id="pcost" type="number" placeholder="Cost">
     <input id="pstock" type="number" placeholder="Stock">
-    <button onclick="addProduct()">Add</button>
+    <button onclick="addProduct()">Add New Product</button>
   </div>
 
   <!-- Reports -->
@@ -76,8 +89,8 @@ button { background:#111; color:#fff; cursor:pointer; }
 </div>
 
 <script>
-const API = "https://js-pos-backend.onrender.com"; // Change if deployed
-let token=""; let products=[]; let cart=[];
+const API = "http://localhost:3000"; // change to deployed backend
+let token="", products=[], cart=[];
 
 // LOGIN
 async function login(){
@@ -87,7 +100,7 @@ async function login(){
   document.getElementById("loginSection").style.display="none";
   document.getElementById("app").style.display="block";
   document.getElementById("userDisplay").innerText=username.value;
-  loadProducts(); loadTransferProducts();
+  loadProducts(); loadStock(); loadTransferProducts();
 }
 
 // LOGOUT
@@ -97,7 +110,8 @@ function logout(){ location.reload(); }
 function showSection(id){
   ["pos","inventory","reports","transfer"].forEach(x=>document.getElementById(x).style.display="none");
   document.getElementById(id).style.display="block";
-  if(id==="reports") loadReports();
+  if(id==="inventory"){ loadStock(); }
+  if(id==="reports"){ loadReports(); }
   if(id==="transfer"){ loadTransferProducts(); loadTransfers(); }
 }
 
@@ -115,7 +129,7 @@ function renderProducts(){
 async function addProduct(){
   const p={item_id:item_id.value,name:pname.value,model:model.value,category:category.value,price:+pprice.value,cost:+pcost.value,stock:+pstock.value};
   await fetch(API+"/products",{method:"POST",headers:{"Content-Type":"application/json","Authorization":token},body:JSON.stringify(p)});
-  loadProducts(); loadTransferProducts();
+  loadProducts(); loadStock(); loadTransferProducts();
 }
 
 // ---------------- CART ----------------
@@ -138,12 +152,53 @@ async function checkout(){
   const pay = await fetch(API+"/mpesa",{method:"POST",headers:{"Content-Type":"application/json","Authorization":token},body:JSON.stringify({phone,amount:total})});
   const data = await pay.json(); if(!data.success){ alert("Payment failed"); return; }
   await fetch(API+"/sale",{method:"POST",headers:{"Content-Type":"application/json","Authorization":token},body:JSON.stringify({items:cart,total,profit})});
-  alert("Sale recorded!"); printReceipt(cart,total); cart=[]; renderCart();
+  alert("Sale recorded!"); printReceipt(cart,total); cart=[]; renderCart(); loadStock();
 }
 
 function printReceipt(cart,total){
   let text=`JS DISTRIBUTORS\n----------------\n`; cart.forEach(p=>text+=`[${p.item_id}] ${p.name} - ${p.model} - ${p.category} - KES ${p.price}\n`);
   text+=`----------------\nTOTAL: KES ${total}\n`; const w=window.open(""); w.document.write("<pre>"+text+"</pre>"); w.print();
+}
+
+// ---------------- INVENTORY ----------------
+async function loadStock(){
+  const res = await fetch(API + "/products", { headers: { Authorization: token } });
+  const data = await res.json();
+  const div = document.getElementById("stockList"); div.innerHTML="";
+  data.forEach(p => { div.innerHTML += `<div class="card">[${p.item_id}] ${p.name} - ${p.model} - ${p.category} - Stock: ${p.stock}</div>`; });
+
+  // Update dropdowns
+  const addSelect = document.getElementById("stockProduct");
+  const sellSelect = document.getElementById("sellProduct");
+  addSelect.innerHTML = ""; sellSelect.innerHTML = "";
+  data.forEach(p => {
+    addSelect.innerHTML += `<option value="${p.id}">${p.name} (Stock:${p.stock})</option>`;
+    sellSelect.innerHTML += `<option value="${p.id}">${p.name} (Stock:${p.stock})</option>`;
+  });
+}
+
+async function addStock(){
+  const product_id = document.getElementById("stockProduct").value;
+  const quantity = +document.getElementById("addStockQty").value;
+  const res = await fetch(API+"/add-stock",{method:"POST",headers:{"Content-Type":"application/json","Authorization":token},body:JSON.stringify({product_id,quantity})});
+  const data = await res.json(); if(data.success){ alert("Stock added!"); loadStock(); }
+}
+
+async function sellStock(){
+  const product_id = document.getElementById("sellProduct").value;
+  const quantity = +document.getElementById("sellQty").value;
+
+  const res1 = await fetch(API+"/products",{ headers:{ Authorization:token } });
+  const products = await res1.json();
+  const product = products.find(p=>p.id==product_id);
+  if(!product){ alert("Product not found"); return; }
+  if(product.stock<quantity){ alert("Insufficient stock"); return; }
+
+  const total = product.price * quantity;
+  const profit = (product.price - product.cost) * quantity;
+  const saleRes = await fetch(API+"/sale",{method:"POST",headers:{"Content-Type":"application/json","Authorization":token},body:JSON.stringify({items:Array(quantity).fill(product),total,profit})});
+  const saleData = await saleRes.json();
+  if(saleData.success){ alert("Sale recorded!"); loadStock(); }
 }
 
 // ---------------- REPORTS ----------------
@@ -159,7 +214,7 @@ async function loadTransferProducts(){
   const res = await fetch(API+"/products",{headers:{"Authorization":token}});
   const data = await res.json();
   const select = document.getElementById("transferProduct"); select.innerHTML="";
-  data.forEach(p=>{ select.innerHTML+=`<option value="${p.id}">${p.name} (Stock: ${p.stock})</option>`; });
+  data.forEach(p=>{ select.innerHTML+=`<option value="${p.id}">${p.name} (Stock:${p.stock})</option>`; });
 }
 
 async function createTransfer(){
