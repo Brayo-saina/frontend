@@ -2,218 +2,97 @@
 <html>
 <head>
   <title>JS DISTRIBUTORS POS</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <style>
-    body { font-family: Arial; margin:0; background:#f5f5f5;}
-    header { background:#111; color:#fff; padding:15px; text-align:center;}
-    .container { padding:15px;}
-    input, button {
-      padding:10px; margin:5px; width:100%;
-      border-radius:8px; border:1px solid #ccc;
-    }
-    button { background:#111; color:#fff; }
-    .card {
-      background:#fff; padding:10px; margin:10px 0;
-      border-radius:10px;
-    }
-  </style>
 </head>
-
 <body>
 
-<header>
-  <h2>JS DISTRIBUTORS POS (KES)</h2>
-</header>
+<h2>JS DISTRIBUTORS POS</h2>
 
-<div class="container">
+<div id="login">
+  <input id="username" placeholder="username">
+  <input id="password" type="password" placeholder="password">
+  <button onclick="login()">Login</button>
+</div>
 
-  <div id="loginSection">
-    <h3>Login</h3>
-    <input id="username" placeholder="Username">
-    <input id="password" type="password" placeholder="Password">
-    <button onclick="login()">Login</button>
-  </div>
+<div id="app" style="display:none">
+  <h3>POS</h3>
 
-  <div id="app" style="display:none">
+  <input id="pname" placeholder="product">
+  <input id="price" placeholder="price">
+  <input id="cost" placeholder="cost">
+  <input id="stock" placeholder="stock">
+  <button onclick="addProduct()">Add Product</button>
 
-    <h3>Welcome <span id="userDisplay"></span></h3>
+  <div id="products"></div>
 
-    <button onclick="show('pos')">POS</button>
-    <button onclick="show('inventory')">Inventory</button>
-    <button onclick="logout()">Logout</button>
-
-    <!-- POS -->
-    <div id="pos">
-      <h3>Products</h3>
-      <div id="products"></div>
-
-      <h3>Cart</h3>
-      <div id="cart"></div>
-
-      <button onclick="checkout()">Pay (M-Pesa)</button>
-    </div>
-
-    <!-- Inventory -->
-    <div id="inventory" style="display:none">
-      <h3>Add Product</h3>
-      <input id="pname" placeholder="Name">
-      <input id="pprice" type="number" placeholder="Price">
-      <input id="pcost" type="number" placeholder="Cost">
-      <input id="pstock" type="number" placeholder="Stock">
-      <button onclick="addProduct()">Add</button>
-    </div>
-
-  </div>
+  <button onclick="sell()">Sell</button>
 </div>
 
 <script>
-const API = "https://your-backend-url.onrender.com"; // CHANGE AFTER DEPLOY
+const API = "http://localhost:3000";
+let token = "";
 
-let users = [{ username:"admin", password:"1234", role:"admin"}];
-let currentUser = null;
+async function login(){
+  let res = await fetch(API+"/login",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      username:username.value,
+      password:password.value
+    })
+  });
 
-let products = [];
-let cart = [];
+  if(res.status!==200) return alert("Login failed");
 
-// 🔐 LOGIN
-function login() {
-  let u = username.value;
-  let p = password.value;
+  let data = await res.json();
+  token = data.token;
 
-  let user = users.find(x => x.username === u && x.password === p);
+  loginDiv.style.display="none";
+  app.style.display="block";
+  loadProducts();
+}
 
-  if (!user) return alert("Wrong login");
-
-  currentUser = user;
-  loginSection.style.display = "none";
-  app.style.display = "block";
-  userDisplay.innerText = user.username;
+async function addProduct(){
+  await fetch(API+"/products",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization":token
+    },
+    body:JSON.stringify({
+      name:pname.value,
+      price:+price.value,
+      cost:+cost.value,
+      stock:+stock.value
+    })
+  });
 
   loadProducts();
 }
 
-// 🔄 LOAD PRODUCTS FROM SERVER
-async function loadProducts() {
-  let res = await fetch(API + "/products");
-  products = await res.json();
-  renderProducts();
-}
-
-// ➕ ADD PRODUCT
-async function addProduct() {
-  let p = {
-    name: pname.value,
-    price: +pprice.value,
-    cost: +pcost.value,
-    stock: +pstock.value
-  };
-
-  products.push(p);
-
-  await fetch(API + "/products", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify(products)
-  });
-
-  renderProducts();
-}
-
-// 🧾 RENDER PRODUCTS
-function renderProducts() {
-  productsDiv = document.getElementById("products");
-  productsDiv.innerHTML = "";
-
-  products.forEach((p,i) => {
-    productsDiv.innerHTML += `
-      <div class="card">
-        ${p.name} - KES ${p.price} (Stock:${p.stock})
-        <button onclick="addToCart(${i})">Add</button>
-      </div>`;
-  });
-}
-
-// 🛒 ADD TO CART
-function addToCart(i) {
-  if (products[i].stock <= 0) return alert("Out of stock");
-
-  products[i].stock--;
-  cart.push(products[i]);
-  renderProducts();
-  renderCart();
-}
-
-// 🧾 CART
-function renderCart() {
-  cartDiv.innerHTML = "";
-  let total = 0;
-
-  cart.forEach(p=>{
-    total += p.price;
-    cartDiv.innerHTML += `<div>${p.name} - ${p.price}</div>`;
-  });
-
-  cartDiv.innerHTML += `<h3>Total: KES ${total}</h3>`;
-}
-
-// 💰 CHECKOUT
-async function checkout() {
-  let total = cart.reduce((s,p)=>s+p.price,0);
-
-  let phone = prompt("Enter phone (07XXXXXXXX):");
-
-  let res = await fetch(API + "/mpesa", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify({ phone, amount: total })
+async function loadProducts(){
+  let res = await fetch(API+"/products",{
+    headers:{ "Authorization":token }
   });
 
   let data = await res.json();
+  products.innerHTML = JSON.stringify(data);
+}
 
-  if (!data.success) return alert("Payment failed");
-
-  let sale = {
-    items: cart,
-    total,
-    user: currentUser.username,
-    date: new Date()
-  };
-
-  await fetch(API + "/sale", {
+async function sell(){
+  await fetch(API+"/sale",{
     method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body: JSON.stringify(sale)
+    headers:{
+      "Content-Type":"application/json",
+      "Authorization":token
+    },
+    body:JSON.stringify({
+      total:1000,
+      profit:200
+    })
   });
 
-  printReceipt(sale);
-
-  cart = [];
-  renderCart();
+  alert("Sale recorded");
 }
-
-// 🧾 RECEIPT
-function printReceipt(sale) {
-  let text = `
-JS DISTRIBUTORS
-----------------
-${sale.items.map(p=>p.name+"-"+p.price).join("\n")}
-----------------
-TOTAL: ${sale.total}
-`;
-
-  let w = window.open("");
-  w.document.write("<pre>"+text+"</pre>");
-  w.print();
-}
-
-// NAV
-function show(x){
-  pos.style.display="none";
-  inventory.style.display="none";
-  document.getElementById(x).style.display="block";
-}
-
-function logout(){ location.reload(); }
 </script>
 
 </body>
