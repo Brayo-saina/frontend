@@ -3,299 +3,195 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JS DISTRIBUTORS POS</title>
-
 <style>
-body { font-family: Arial; margin:0; background:#f4f6f9; }
-header { background:#0d6efd; color:#fff; padding:15px; text-align:center; }
-nav { display:flex; justify-content:space-around; background:#fff; padding:10px; }
-nav button { padding:10px; background:#0d6efd; color:#fff; border:none; border-radius:6px; }
-
-.container { padding:15px; }
-
-.card {
-  background:#fff;
-  padding:10px;
-  margin:10px 0;
-  border-radius:10px;
-  box-shadow:0 2px 5px rgba(0,0,0,0.1);
-}
-
-input, select {
-  width:100%;
-  padding:10px;
-  margin:5px 0;
-  border-radius:6px;
-  border:1px solid #ccc;
-}
-
-button { padding:10px; border:none; border-radius:6px; margin-top:5px; }
-.btn { background:#0d6efd; color:white; }
-.success { background:#198754; }
+body{font-family:Arial;background:#f5f5f5}
+button,input,select{width:100%;padding:10px;margin:5px;border-radius:8px}
+.card{background:#fff;padding:10px;margin:10px;border-radius:10px}
 </style>
 </head>
-
 <body>
 
-<header>JS DISTRIBUTORS POS</header>
+<h2>JS DISTRIBUTORS POS</h2>
 
-<div class="container">
-
-<!-- LOGIN -->
 <div id="login">
-  <h3>Login</h3>
-  <input id="username" placeholder="Username">
-  <input id="password" type="password" placeholder="Password">
-  <button class="btn" id="loginBtn">Login</button>
+<input id="username" placeholder="Username">
+<input id="password" type="password">
+<button onclick="login()">Login</button>
 </div>
 
-<!-- APP -->
 <div id="app" style="display:none">
 
-<nav>
-  <button onclick="show('pos')">POS</button>
-  <button onclick="show('inventory')">Inventory</button>
-  <button onclick="show('transfer')">Transfers</button>
-</nav>
+<button onclick="show('pos')">POS</button>
+<button onclick="show('inventory')">Inventory</button>
+<button onclick="show('transfer')">Transfers</button>
 
-<!-- POS -->
 <div id="pos">
-  <div id="products"></div>
-  <h3>Cart</h3>
-  <div id="cart"></div>
-  <button class="success" onclick="checkout()">Checkout</button>
+<div id="products"></div>
+<div id="cart"></div>
+<button onclick="checkout()">Pay</button>
 </div>
 
-<!-- INVENTORY -->
 <div id="inventory" style="display:none">
-  <h3>Stock</h3>
-  <div id="stock"></div>
+<h3>Stock</h3>
+<div id="stock"></div>
 
-  <h3>Add Product</h3>
-  <input id="item_id" placeholder="Item ID">
-  <input id="pname" placeholder="Name">
-  <input id="model" placeholder="Model">
-  <input id="category" placeholder="Category">
-  <input id="price" type="number" placeholder="Price">
-  <input id="cost" type="number" placeholder="Cost">
-  <input id="stock_qty" type="number" placeholder="Stock">
-  <button class="btn" onclick="addProduct()">Add Product</button>
+<h3>Add Product</h3>
+<input id="item_id" placeholder="Item ID">
+<input id="name" placeholder="Name">
+<input id="model" placeholder="Model">
+<input id="category" placeholder="Category">
+<input id="price" placeholder="Price">
+<input id="cost" placeholder="Cost">
+<input id="stock_qty" placeholder="Stock">
+<button onclick="addProduct()">Add</button>
 
-  <h3>Add Stock</h3>
-  <select id="stockProduct"></select>
-  <input id="addQty" type="number">
-  <button class="success" onclick="addStock()">Add Stock</button>
+<h3>Add Stock</h3>
+<select id="pselect"></select>
+<input id="qty">
+<button onclick="addStock()">Add Stock</button>
 </div>
 
-<!-- TRANSFER -->
 <div id="transfer" style="display:none">
-  <h3>Add Agent</h3>
-  <input id="agentName">
-  <input id="agentPhone">
-  <input id="agentId">
-  <button class="btn" onclick="addAgent()">Save</button>
+<h3>Add Agent</h3>
+<input id="aname" placeholder="Name">
+<input id="aphone" placeholder="Phone">
+<input id="aid" placeholder="ID">
+<button onclick="addAgent()">Save</button>
 
-  <h3>Transfer</h3>
-  <select id="agentSelect"></select>
-  <select id="transferProduct"></select>
-  <input id="transferQty">
-  <button class="success" onclick="transfer()">Transfer</button>
+<h3>Transfer</h3>
+<select id="agent"></select>
+<select id="product"></select>
+<input id="tqty">
+<button onclick="transfer()">Transfer</button>
 
-  <div id="history"></div>
+<div id="history"></div>
 </div>
 
-</div>
 </div>
 
 <script>
-const API = "https://js-pos-backend.onrender.com/";
-let products = [], cart = [];
+const API="http://localhost:3000";
+let token,products=[],cart=[];
 
 // LOGIN
-document.getElementById("loginBtn").onclick = async function(){
-  const res = await fetch(API + "/login", {
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      username:username.value,
-      password:password.value
-    })
-  });
-
-  const data = await res.json();
-
-  if(data.error){
-    alert(data.error);
-    return;
-  }
-
-  login.style.display="none";
-  app.style.display="block";
-  loadAll();
-};
-
-// NAV
-function show(id){
-  pos.style.display="none";
-  inventory.style.display="none";
-  transfer.style.display="none";
-  document.getElementById(id).style.display="block";
+async function login(){
+const r=await fetch(API+"/login",{method:"POST",headers:{"Content-Type":"application/json"},
+body:JSON.stringify({username:username.value,password:password.value})});
+const d=await r.json();
+if(!d.token)return alert("Login failed");
+token=d.token;
+login.style.display="none";app.style.display="block";
+loadAll();
 }
 
 // LOAD ALL
 function loadAll(){
-  loadProducts();
-  loadStock();
-  loadAgents();
-  loadTransfers();
+loadProducts();
+loadStock();
+loadAgents();
+loadTransfers();
 }
 
 // PRODUCTS
 async function loadProducts(){
-  const r = await fetch(API + "/products");
-  products = await r.json();
-
-  let html="";
-  products.forEach((p,i)=>{
-    html += `<div class="card">
-      ${p.name} (${p.stock})
-      <button onclick="addCart(${i})">Add</button>
-    </div>`;
-  });
-
-  document.getElementById("products").innerHTML = html;
+const r=await fetch(API+"/products",{headers:{Authorization:token}});
+products=await r.json();
+let html="";
+products.forEach((p,i)=>{
+html+=`<div class="card">${p.name} (${p.stock}) <button onclick="addCart(${i})">Add</button></div>`;
+});
+productsDiv.innerHTML=html;
 }
 
 // CART
-function addCart(i){
-  cart.push(products[i]);
-  renderCart();
-}
-
+function addCart(i){cart.push(products[i]);renderCart();}
 function renderCart(){
-  let total=0, html="";
-  cart.forEach(p=>{
-    total+=p.price;
-    html+=p.name+"<br>";
-  });
-  html += "<b>Total: "+total+"</b>";
-  cart.innerHTML=html;
+let t=0,html="";
+cart.forEach(p=>{t+=p.price;html+=p.name+"<br>";});
+html+="TOTAL:"+t;
+cartDiv.innerHTML=html;
 }
 
 // CHECKOUT
 async function checkout(){
-  for(let p of cart){
-    await fetch(API+"/add-stock",{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({product_id:p.id,quantity:-1})
-    });
-  }
-  cart=[];
-  renderCart();
-  loadAll();
+const total=cart.reduce((s,p)=>s+p.price,0);
+await fetch(API+"/mpesa",{method:"POST",headers:{Authorization:token}});
+await fetch(API+"/sale",{method:"POST",headers:{"Content-Type":"application/json",Authorization:token},
+body:JSON.stringify({items:cart,total,profit:0})});
+alert("Done");
+cart=[];renderCart();loadProducts();
 }
 
-// STOCK
+// INVENTORY
 async function loadStock(){
-  const r = await fetch(API+"/products");
-  const d = await r.json();
-
-  let html="";
-  stockProduct.innerHTML="";
-  transferProduct.innerHTML="";
-
-  d.forEach(p=>{
-    html+=`<div class="card">${p.name} - ${p.stock}</div>`;
-    stockProduct.innerHTML+=`<option value="${p.id}">${p.name}</option>`;
-    transferProduct.innerHTML+=`<option value="${p.id}">${p.name}</option>`;
-  });
-
-  stock.innerHTML=html;
+const r=await fetch(API+"/products",{headers:{Authorization:token}});
+const d=await r.json();
+let html="";
+pselect.innerHTML="";
+d.forEach(p=>{
+html+=`<div class="card">${p.name} - ${p.stock}</div>`;
+pselect.innerHTML+=`<option value="${p.id}">${p.name}</option>`;
+});
+stock.innerHTML=html;
 }
 
 // ADD PRODUCT
 async function addProduct(){
-  await fetch(API+"/products",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      item_id:item_id.value,
-      name:pname.value,
-      model:model.value,
-      category:category.value,
-      price:+price.value,
-      cost:+cost.value,
-      stock:+stock_qty.value
-    })
-  });
-  loadAll();
+await fetch(API+"/products",{method:"POST",headers:{"Content-Type":"application/json",Authorization:token},
+body:JSON.stringify({
+item_id:item_id.value,name:name.value,model:model.value,category:category.value,
+price:+price.value,cost:+cost.value,stock:+stock_qty.value
+})});
+loadAll();
 }
 
 // ADD STOCK
 async function addStock(){
-  await fetch(API+"/add-stock",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      product_id:stockProduct.value,
-      quantity:+addQty.value
-    })
-  });
-  loadStock();
+await fetch(API+"/add-stock",{method:"POST",headers:{"Content-Type":"application/json",Authorization:token},
+body:JSON.stringify({product_id:pselect.value,quantity:+qty.value})});
+loadStock();
 }
 
 // AGENTS
 async function loadAgents(){
-  const r=await fetch(API+"/agents");
-  const d=await r.json();
-  agentSelect.innerHTML="";
-  d.forEach(a=>{
-    agentSelect.innerHTML+=`<option value="${a.id}">${a.name}</option>`;
-  });
+const r=await fetch(API+"/agents",{headers:{Authorization:token}});
+const d=await r.json();
+agent.innerHTML="";
+d.forEach(a=>{
+agent.innerHTML+=`<option value="${a.id}">${a.name}</option>`;
+});
 }
 
 async function addAgent(){
-  await fetch(API+"/agents",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      name:agentName.value,
-      phone:agentPhone.value,
-      id_number:agentId.value
-    })
-  });
-  loadAgents();
+await fetch(API+"/agents",{method:"POST",headers:{"Content-Type":"application/json",Authorization:token},
+body:JSON.stringify({name:aname.value,phone:aphone.value,id_number:aid.value})});
+loadAgents();
 }
 
 // TRANSFER
 async function transfer(){
-  const r=await fetch(API+"/transfer",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({
-      agent_id:agentSelect.value,
-      product_id:transferProduct.value,
-      quantity:+transferQty.value
-    })
-  });
-
-  const d=await r.json();
-  if(d.error) return alert(d.error);
-
-  loadAll();
+await fetch(API+"/transfer",{method:"POST",headers:{"Content-Type":"application/json",Authorization:token},
+body:JSON.stringify({agent_id:agent.value,product_id:product.value,quantity:+tqty.value})});
+loadAll();
 }
 
-// HISTORY
+// TRANSFERS
 async function loadTransfers(){
-  const r=await fetch(API+"/transfers");
-  const d=await r.json();
+const r=await fetch(API+"/transfers",{headers:{Authorization:token}});
+const d=await r.json();
+let html="";
+d.forEach(t=>{
+html+=`<div class="card">${t.agent_name} → ${t.product_name} (${t.quantity})</div>`;
+});
+history.innerHTML=html;
+}
 
-  let html="";
-  d.forEach(t=>{
-    html+=`<div class="card">${t.agent_name} → ${t.product_name}</div>`;
-  });
-
-  history.innerHTML=html;
+// NAV
+function show(id){
+pos.style.display="none";
+inventory.style.display="none";
+transfer.style.display="none";
+document.getElementById(id).style.display="block";
 }
 </script>
 
